@@ -260,6 +260,9 @@ class SimpleCov::Formatter::Codecov
     url = ENV['CODECOV_URL'] || "https://codecov.io"
     uri = URI.parse(url.chomp('/') + "/upload/v1")
 
+    max_retries = ENV['CODECOV_UPLOAD_RETRIES'] || 3
+    abort_on_upload_failure = ENV['CODECOV_ABORT_ON_UPLOAD_FAILURE'] || false
+
     uri.query = URI.encode_www_form(params)
 
     # get https
@@ -293,16 +296,18 @@ class SimpleCov::Formatter::Codecov
       report
 
     rescue StandardError => err
-      retries +=1
       puts 'Error uploading coverage reports to Codecov. Sorry'
       puts err
-      if retries <= 3
-        puts "retry ##{retries}"
+
+      if retries < max_retries
+        puts "Retrying upload..."
         sleep rand(5..15)
+        retries += 1
         retry
+      elsif abort_on_upload_failure
+        abort("Still failing after #{max_retries} retries, aborting.")
       end
     end
-
   end
 
   private
